@@ -16,7 +16,7 @@ PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-RETRY_TIME = 300
+RETRY_TIME = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
@@ -52,7 +52,7 @@ def get_api_answer(current_timestamp: int) -> List[Any]:
             'Сбой в работе программы: '
             f'Эндпоинт {ENDPOINT} недоступен. Код ответа API: {exception}'
         )
-        logger.error(message)
+        raise requests.RequestException(message)
 
     if response.status_code != HTTPStatus.OK:
         raise ValueError('Код ответа сервера не соответствует '
@@ -63,38 +63,31 @@ def get_api_answer(current_timestamp: int) -> List[Any]:
 
 def check_response(response: Dict[str, Any]) -> List[Any]:
     """Проверка ответа от API."""
-    key = 'homeworks'
-    try:
-        check = response[key]
-
-    except KeyError as error:
-        message1 = f'Пустой список: {error}'
-        logger.error(message1)
-        raise KeyError(message1)
-    else:
-        if not isinstance(check, list):
-            error_msg = (
-                f'Под ключом {key} в ответе API '
-                f'содержится некорректный тип: {type(check)}'
-            )
-            logger.debug(error_msg)
-            raise TypeError(error_msg)
-
-    return check
+    result = []
+    if type(response) is not dict:
+        error_msg = (
+            'Cодержится некорректный тип ответа от http-запроса: '
+            f'{type(response)}'
+        )
+        raise TypeError(error_msg)
+    result = response.get('homeworks')
+    if type(result) is not list:
+        error_msg = (
+            f'Некорректный тип: {type(result)} у списка "homeworks"'
+        )
+        raise TypeError(error_msg)
+    return result
 
 
-def parse_status(homework: List[Any]) -> str:
+def parse_status(homework: Dict[str, Any]) -> str:
     """Получение статуса из ответа."""
     try:
-        homework_name = homework['homework_name']
-        homework_status = homework['status']
-
+        homework_name = homework.get('homework_name')
+        homework_status = homework.get('status')
+        verdict = HOMEWORK_STATUSES[homework_status]
     except KeyError as error:
-        message = f'Недокументированный статус {error} домашней работы.'
-        logger.error(message)
+        message = f'Недокументированный статус {error} в домашней работы.'
         raise KeyError(message)
-
-    verdict = HOMEWORK_STATUSES[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
@@ -123,9 +116,13 @@ def main() -> None:
     while True:
         try:
             response = get_api_answer(current_timestamp)
-            check = check_response(response)
-            send_message(bot, parse_status(check))
-            logger.info('Бот успешно отправил сообщение.')
+            homeworks = check_response(response)
+            logger.log(10, f'Запрос с {ENDPOINT} получен')
+            logger.log(10, f'В запросе данные о {len(homeworks)} событиях')
+            for homework in homeworks:
+                message = parse_status(homework)
+                logger.log(10, message)
+                send_message(bot, message)
             current_timestamp = response.get('current_date')
             time.sleep(RETRY_TIME)
 
