@@ -132,8 +132,7 @@ def main() -> None:
             send_message(bot, message)
             time.sleep(RETRY_TIME)
         else:
-            logger.info('Программа принудительно приостановлена.')
-            break
+            logger.info('Обновлений нет.')
 
 
 if __name__ == '__main__':
