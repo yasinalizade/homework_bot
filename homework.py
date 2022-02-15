@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import sys
@@ -37,7 +38,11 @@ logger.addHandler(handler)
 
 def send_message(bot: "telegram.Bot", message: str) -> None:
     """Отправка сообщений в бот."""
-    bot.send_message(TELEGRAM_CHAT_ID, message)
+    try:
+        bot.send_message(TELEGRAM_CHAT_ID, message)
+    except telegram.TelegramError:
+        message = 'Возникла ошибка при отправке сообщения.'
+        raise telegram.TelegramError(message)
 
 
 def get_api_answer(current_timestamp: int) -> List[Any]:
@@ -56,9 +61,12 @@ def get_api_answer(current_timestamp: int) -> List[Any]:
 
     if response.status_code != HTTPStatus.OK:
         raise ValueError('Код ответа сервера не соответствует '
-                         f'ожидаемому при запросе {ENDPOINT}')
+                         f'ожидаемому при запросе {ENDPOINT}.')
 
-    return response.json()
+    try:
+        return response.json()
+    except json.decoder.JSONDecodeError:
+        raise ValueError('Ответ сервера не в формате json.')
 
 
 def check_response(response: Dict[str, Any]) -> List[Any]:
@@ -67,13 +75,13 @@ def check_response(response: Dict[str, Any]) -> List[Any]:
     if type(response) is not dict:
         error_msg = (
             'Cодержится некорректный тип ответа от http-запроса: '
-            f'{type(response)}'
+            f'{type(response)}.'
         )
         raise TypeError(error_msg)
     result = response.get('homeworks')
     if type(result) is not list:
         error_msg = (
-            f'Некорректный тип: {type(result)} у списка "homeworks"'
+            f'Некорректный тип: {type(result)} у списка "homeworks".'
         )
         raise TypeError(error_msg)
     return result
@@ -81,9 +89,9 @@ def check_response(response: Dict[str, Any]) -> List[Any]:
 
 def parse_status(homework: Dict[str, Any]) -> str:
     """Получение статуса из ответа."""
+    homework_name = homework.get('homework_name')
+    homework_status = homework.get('status')
     try:
-        homework_name = homework.get('homework_name')
-        homework_status = homework.get('status')
         verdict = HOMEWORK_STATUSES[homework_status]
     except KeyError as error:
         message = f'Недокументированный статус {error} в домашней работы.'
@@ -101,7 +109,7 @@ def check_tokens() -> bool:
 
     except AssertionError as error:
         flag = False
-        message = f'Отсутствует обязательная переменная окружения: {error}'
+        message = f'Отсутствует обязательная переменная окружения: {error}.'
         logger.critical(message)
 
     return flag
@@ -111,14 +119,14 @@ def main() -> None:
     """Основная логика работы бота."""
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
-    check_tokens()
 
     while True:
+        check_tokens()
         try:
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
-            logger.log(10, f'Запрос с {ENDPOINT} получен')
-            logger.log(10, f'В запросе данные о {len(homeworks)} событиях')
+            logger.log(10, f'Запрос с {ENDPOINT} получен.')
+            logger.log(10, f'В запросе данные о {len(homeworks)} событиях.')
             for homework in homeworks:
                 message = parse_status(homework)
                 logger.log(10, message)
