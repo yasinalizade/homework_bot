@@ -124,27 +124,30 @@ def main() -> None:
     """Основная логика работы бота."""
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
+    if check_tokens():
+        while True:
+            try:
+                response = get_api_answer(current_timestamp)
+                homeworks = check_response(response)
+                logger.log(10, f'Запрос с {ENDPOINT} получен.')
+                logger.log(
+                    10,
+                    f'В запросе данные о {len(homeworks)} событиях.'
+                )
+                for homework in homeworks:
+                    message = parse_status(homework)
+                    logger.log(10, message)
+                    send_message(bot, message)
+                current_timestamp = response.get('current_date')
+                time.sleep(RETRY_TIME)
 
-    while check_tokens() is True:
-        try:
-            response = get_api_answer(current_timestamp)
-            homeworks = check_response(response)
-            logger.log(10, f'Запрос с {ENDPOINT} получен.')
-            logger.log(10, f'В запросе данные о {len(homeworks)} событиях.')
-            for homework in homeworks:
-                message = parse_status(homework)
-                logger.log(10, message)
+            except Exception as error:
+                message = f'Сбой в работе программы: {error}'
+                logger.error(message)
                 send_message(bot, message)
-            current_timestamp = response.get('current_date')
-            time.sleep(RETRY_TIME)
-
-        except Exception as error:
-            message = f'Сбой в работе программы: {error}'
-            logger.error(message)
-            send_message(bot, message)
-            time.sleep(RETRY_TIME)
-        else:
-            logger.info('Обновлений нет.')
+                time.sleep(RETRY_TIME)
+            else:
+                logger.info('Обновлений нет.')
 
 
 if __name__ == '__main__':
