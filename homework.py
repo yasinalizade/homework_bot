@@ -40,6 +40,7 @@ def send_message(bot: "telegram.Bot", message: str) -> None:
     """Отправка сообщений в бот."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
+
     except telegram.TelegramError:
         message = 'Возникла ошибка при отправке сообщения.'
         raise telegram.TelegramError(message)
@@ -65,6 +66,7 @@ def get_api_answer(current_timestamp: int) -> List[Any]:
 
     try:
         return response.json()
+
     except json.decoder.JSONDecodeError:
         raise ValueError('Ответ сервера не в формате json.')
 
@@ -89,13 +91,16 @@ def check_response(response: Dict[str, Any]) -> List[Any]:
 
 def parse_status(homework: Dict[str, Any]) -> str:
     """Получение статуса из ответа."""
-    homework_name = homework.get('homework_name')
-    homework_status = homework.get('status')
+    if len(homework) > 0:
+        homework_name = homework.get('homework_name')
+        homework_status = homework.get('status')
     try:
         verdict = HOMEWORK_STATUSES[homework_status]
+
     except KeyError as error:
         message = f'Недокументированный статус {error} в домашней работы.'
         raise KeyError(message)
+
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
@@ -120,8 +125,7 @@ def main() -> None:
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
 
-    while True:
-        check_tokens()
+    while check_tokens() is True:
         try:
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
