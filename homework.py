@@ -91,15 +91,17 @@ def check_response(response: Dict[str, Any]) -> List[Any]:
 
 def parse_status(homework: Dict[str, Any]) -> str:
     """Получение статуса из ответа."""
-    if len(homework) > 0:
-        homework_name = homework.get('homework_name')
-        homework_status = homework.get('status')
+    homework_name = homework.get('homework_name')
+    homework_status = homework.get('status')
     try:
+        homework['homework_name']
         verdict = HOMEWORK_STATUSES[homework_status]
 
     except KeyError as error:
         message = f'Недокументированный статус {error} в домашней работы.'
         raise KeyError(message)
+    except AssertionError:
+        raise AssertionError('Названия домашнего задания нет в списке.')
 
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
